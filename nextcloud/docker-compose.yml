@@ -1,0 +1,102 @@
+version: "3"
+
+services:
+  db:
+    image: mariadb
+    container_name: nextcloud_db
+    hostname: mariadb
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    restart: always
+    privileged: true
+    volumes:
+      - db:/var/lib/mysql
+    env_file:
+      - db.env
+    networks:
+      - nextcloud_net
+
+  nextcloud:
+    image: nextcloud:fpm
+    container_name: nextcloud_main
+    restart: always
+    hostname: nextcloud
+    depends_on:
+      - db
+      - redis
+    privileged: true
+    environment:
+      # redis
+      - REDIS_HOST=redis
+      - REDIS_HOST_PORT=6379
+      # mysql
+      - MYSQL_HOST=db
+      # SMTP (optional)
+      - SMTP_HOST=
+      - SMTP_SECURE=
+      - SMTP_PORT=
+      - SMTP_AUTHTYPE=
+      - SMTP_NAME=
+      - SMTP_PASSWORD=
+      - MAIL_FROM_ADDRESS=
+      - MAIL_DOMAIN=
+    env_file: 
+      - db.env
+    links:
+      - db
+      - redis
+    volumes:
+      - nextcloud:/var/www/html
+      - /mnt/data:/mnt
+    networks:
+      - nextcloud_net
+
+  nginx:
+    build: nginx
+    container_name: nextcloud_nginx
+    restart: always
+    expose: 
+      - 80
+    ports: 
+      - 80:80
+      - 443:443
+    volumes: 
+      - nextcloud:/var/www/html:ro
+      - ../certbot/certs:/etc/letsencrypt
+    depends_on: 
+      - nextcloud
+    networks:
+      - nextcloud_net
+    links:
+      - nextcloud
+    environment:
+      - VIRTUAL_PORT=https
+
+  redis:
+    image: redis
+    container_name: nextcloud_redis
+    restart: always
+    hostname: redis
+    expose:
+      - 6379
+    networks:
+      - nextcloud_net
+
+  cron:
+    image: nextcloud:fpm
+    container_name: nextcloud_cron
+    restart: always
+    volumes:
+      - nextcloud:/var/www/html
+    entrypoint: /cron.sh
+    depends_on:
+      - db
+      - redis
+    networks:
+      - nextcloud_net
+
+networks:
+  nextcloud_net:
+
+volumes:
+  db:
+  nextcloud:

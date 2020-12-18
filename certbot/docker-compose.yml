@@ -1,0 +1,34 @@
+version: "3"
+
+services:
+  nginx:
+    build: nginx
+    container_name: certbot_nginx
+    restart: "no"
+    expose: 
+      - 80
+    ports: 
+      - 80:80
+      - 443:443
+    volumes: 
+      - ./certs:/etc/letsencrypt
+      - webroot:/usr/share/nginx/html/
+    environment:
+      - VIRTUAL_PORT=https
+
+  cert:
+    image: certbot/certbot
+    container_name: certbot_main
+    restart: "no"
+    volumes:
+      - ./certs:/etc/letsencrypt
+      - webroot:/webroot
+    entrypoint: ["certbot", "certonly", "--webroot", "--webroot-path=/webroot",
+    "--email","username@domain.com",
+    "-d","www.sample.com",  # <!>
+    "--agree-tos","--no-eff-email"]
+    depends_on: 
+      - certbot_nginx
+
+volumes:
+  webroot:
